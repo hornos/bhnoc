@@ -1,0 +1,9 @@
+.sav
+.old
+.env*
+node_modules
+*.pyc
+venv
+credentials
+__pycache__
+

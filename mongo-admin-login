@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+_dirname=$(dirname $0)
+source "${_dirname}/lib/general.sh"
+
+parse_params() {
+  # default values of variables set from params
+
+  while :; do
+    case "${1-}" in
+    -h | --help) usage ;;
+    -v | --verbose) set -x ;;
+    --no-color) NO_COLOR=1 ;;
+    -?*) die "Unknown option: $1" ;;
+    *) break ;;
+    esac
+    shift
+  done
+
+  args=("$@")
+
+  # # check required params and arguments
+  # [[ -z "${param-}" ]] && die "Missing required parameter: param"
+  # [[ ${#args[@]} -eq 0 ]] && die "Missing script arguments"
+
+  return 0
+}
+
+parse_params "$@"
+setup_colors
+
+## MAIN
+DOTENV="${DOTENV:-.env.admin}"
+if ! test -r "${DOTENV}"; then
+  die "Dotenv file not found: ${DOTENV}"
+fi
+source "${DOTENV}"
+
+echo "Login to $MONGO_USERNAME@$MONGO_HOST"
+
+mongo --verbose \
+      --host $MONGO_HOST \
+      -u $MONGO_USERNAME \
+      --tls --tlsCertificateKeyFile $MONGO_SSL_KEYFILE \
+      --tlsCAFile $MONGO_SSL_CA_CERTS
+
