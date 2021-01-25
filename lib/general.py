@@ -10,9 +10,10 @@ from distutils.util import strtobool
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
+import asyncio
+from periodic import Periodic
+
 # import json
-# import asyncio
-# from periodic import Periodic
 # import time
 # from datetime import datetime
 # from dateutil import tz
@@ -47,11 +48,11 @@ def utc2local(date):
 # def
 
 class Application:
-  def __init__(self, file = __file__ ):
-    self.__file__ = file
+  def __init__(self, __file = __file__ ):
+    self.__file__ = __file
     # TODO: https://stackoverflow.com/questions/6290739/python-logging-use-milliseconds-in-time-format
     logging.basicConfig(
-      format="[%s] " % (os.path.basename(__file__))  + '%(asctime)s %(levelname)-8s %(message)s',
+      format="[%s] " % (os.path.basename(self.__file__))  + '%(asctime)s %(levelname)-8s %(message)s',
       level=logging.INFO,
       datefmt='%Y-%m-%d %H:%M:%S')
     self.log = logging.getLogger(__name__)
@@ -60,12 +61,13 @@ class Application:
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug',default=False, action='store_true', help='Run in debug mode (verbose logging)')
     parser.add_argument('--production',default=False, action='store_true', help='Run in production mode')
+    parser.add_argument('--list',default=False, action='store_true', help='List canonical status in a table')
     parser.add_argument('--initialize',default=False, action='store_true', help='Initialize database or anything else (run only once first time)')
     parser.add_argument('--loop',type=int, help='Run in every LOOP sec')
     self.customArgumentParser(parser)
     self.arguments = parser.parse_args()
 
-    env = os.path.dirname(self.__file__) + "/.env"
+    env = os.environ.get('DOTENV') or os.path.dirname(self.__file__) + "/.env"
     self.log.info("Dotenv: " + env)
     self.config = dotenv_values( env )
 
@@ -85,6 +87,39 @@ class Application:
   def customArgumentParser(self,parser):
     pass
 
+  def initialize(self):
+    pass
+
+  def selfcheck(self):
+    pass
+
+  def main(self):
+    if self.arguments.initialize:
+      return self.initialize()
+    if self.arguments.loop:
+      loop = asyncio.get_event_loop()
+      loop.create_task(self.startPeriodic())
+      return loop.run_forever()
+    # default
+    # calls self.getSatusData
+    self.getStatus()
+    # converts status to assoc array for bulk upsert
+    self.convertStatus()
+
+    if self.arguments.list:
+      self.showStatus()
+
+    if self.arguments.production:
+      self.upsertStatus()
+  # def
+
+  ## STATUS
+  def showStatus(self):
+    pass
+
+  def getSatusData(self):
+    pass
+
   def getStatus(self):
     self.log.debug('request getStatus')
     try:
@@ -102,79 +137,35 @@ class Application:
     # pp.pprint(self.status)
   #def
 
-  def processStatus(self):
-    # calls self.getSatusData
-    self.getStatus()
-    # converts status to assoc array for bulk upsert
-    self.convertStatus()
-    if self.arguments.production:
-      return self.upsertStatus()
-  # def
-
-  def main(self):
-    if self.arguments.initialize:
-      return self.initialize()
-    if self.arguments.loop:
-      return self.startLoop()
-    self.processStatus()
-
-    # if self.args.loop:
-    #   return self.startLoop()
-    # if self.args.debug:
-    #   pp.pprint(self.status)
-    # if self.args.save:
-    #   self.insertData()
-  # def
-
-
   def upsertStatus(self, db_id, col_id):
     # https://stackoverflow.com/questions/5292370/fast-or-bulk-upsert-in-pymongo
     self.db.bulkUpsert(self.canonicalStatus, db_id, col_id)
 
-  def getSatusData(self):
-    pass
-
   def convertStatus(self):
     self.canonicalStatus = self.status
 
-  def initialize(self):
-    pass
-
-  def selfcheck(self):
-    pass
-
-
-
-  def findOne(self,key=None, value=None):
-    # https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
-    return next((item for item in self.status['data'] if item[key] == value), None)
-
-
-  def insertData(self):
-    client = conn_mongodb( self.config['mongo'] )
-    db = client['raynet']
-    # pp.pprint(self.status)
-    # print(self.config[self._basename]['collection'])
-    collection = db[self.config[self._basename]['collection']]
-    insert_id = collection.insert_one(self.status).inserted_id
-    client.close()
-    logging.info("%s: New log inserted: %s" % (self._basename, insert_id))
-
-
+  ## PERIODIC
   async def periodically(self):
-    self.getStatus()
-    if self.args.debug:
-      pp.pprint(self.status)
-    self.insertData()
-    logging.info("%s: Start waiting: %s" % (self._basename, self.args.loop))
+    self.log.info("Start periodic processing...")
+    self.processStatus()
+    self.log.info("Start waiting: %s s" % (self.arguments.loop))
 
   async def startPeriodic(self):
-    p = Periodic(self.args.loop, self.periodically)
+    p = Periodic(self.arguments.loop, self.periodically)
     await p.start(0)
 
-  def startLoop(self):
-    loop = asyncio.get_event_loop()
-    loop.create_task(self.startPeriodic())
-    loop.run_forever()
+#  def findOne(self,key=None, value=None):
+#    # https://stackoverflow.com/questions/8653516/python-list-of-dictionaries-search
+#    return next((item for item in self.status['data'] if item[key] == value), None)
+#
+#  def insertData(self):
+#    client = conn_mongodb( self.config['mongo'] )
+#    db = client['raynet']
+#    # pp.pprint(self.status)
+#    # print(self.config[self._basename]['collection'])
+#    collection = db[self.config[self._basename]['collection']]
+#    insert_id = collection.insert_one(self.status).inserted_id
+#    client.close()
+#    logging.info("%s: New log inserted: %s" % (self._basename, insert_id))
 
 #def
