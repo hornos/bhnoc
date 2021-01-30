@@ -58,14 +58,10 @@ class Application:
     self.log = logging.getLogger(__name__)
 
     ## CLI Arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--debug',default=False, action='store_true', help='Run in debug mode (verbose logging)')
-    parser.add_argument('--production',default=False, action='store_true', help='Run in production mode')
-    parser.add_argument('--list',default=False, action='store_true', help='List canonical status in a table')
-    parser.add_argument('--initialize',default=False, action='store_true', help='Initialize database or anything else (run only once first time)')
-    parser.add_argument('--loop',type=int, help='Run in every LOOP sec')
-    self.customArgumentParser(parser)
-    self.arguments = parser.parse_args()
+    self.arg_parser = argparse.ArgumentParser()
+    self.defaultArgumentParser()
+    self.customArgumentParser()
+    self.arguments = self.arg_parser.parse_args()
 
     env = os.environ.get('DOTENV') or os.path.dirname(self.__file__) + "/.env"
     self.log.info("Dotenv: " + env)
@@ -84,7 +80,15 @@ class Application:
     self.db = Database(self.arguments, self.config)
   #def
 
-  def customArgumentParser(self,parser):
+  def defaultArgumentParser(self):
+    self.arg_parser.add_argument('--debug',default=False, action='store_true', help='Run in debug mode (verbose logging)')
+    self.arg_parser.add_argument('--production',default=False, action='store_true', help='Run in production mode')
+    self.arg_parser.add_argument('--list',default=False, action='store_true', help='List canonical status in a table')
+    self.arg_parser.add_argument('--initialize',default=False, action='store_true', help='Initialize database or anything else (run only once first time)')
+    self.arg_parser.add_argument('--loop',type=int, help='Run in every LOOP sec')
+  # def
+
+  def customArgumentParser(self):
     pass
 
   def initialize(self):
